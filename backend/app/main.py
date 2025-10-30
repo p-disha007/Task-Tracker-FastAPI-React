@@ -5,6 +5,8 @@ from typing import List, Optional
 
 from . import crud, models, schemas
 from .database import SessionLocal, engine
+from .schemas import TaskCreate
+
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Mini Task Tracker")
@@ -26,12 +28,17 @@ def get_db():
         yield db
     finally:
         db.close()
-@app.post("/tasks", response_model=schemas.Task)
+
+@app.post("/tasks", response_model=schemas.Task, status_code=201)
 def create_task(task: schemas.TaskCreate, db: Session = Depends(get_db)):
     """
     Add a new task.
+    TEMPORARY FIX: Assigns owner_id=1 to satisfy the NOT NULL constraint.
+    This must be replaced with a real authentication dependency later.
     """
-    return crud.create_task(db=db, task=task)
+    task_with_owner = task.model_copy(update={"owner_id": 1})
+
+    return crud.create_task(db=db, task=task_with_owner)
 
 
 @app.get("/tasks", response_model=List[schemas.Task])
@@ -62,8 +69,7 @@ def update_task_status(
     if db_task is None:
         raise HTTPException(status_code=404, detail="Task not found")
     return db_task
-
-
+    
 @app.get("/insights", response_model=schemas.InsightSummary)
 def get_insights(db: Session = Depends(get_db)):
     """
